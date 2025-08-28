@@ -12,6 +12,7 @@ pub mod solflip {
     // Phase 1: Commit to a choice with hash
     pub fn commit_flip(ctx: Context<CommitFlip>, _seed: String, commitment_hash: [u8; 32], bid: u64) -> Result<()> {
         let commitment_account = &mut ctx.accounts.commitment_account;
+        let flip_account = &mut ctx.accounts.flip_account;
         
         // Transfer bid amount to vault (user must pay upfront)
         let cpi = CpiContext::new(
@@ -29,6 +30,14 @@ pub mod solflip {
         commitment_account.bid = bid;
         commitment_account.timestamp = Clock::get()?.unix_timestamp;
         commitment_account.revealed = false;
+
+        // Initialize flip account during commit so user pays all costs upfront
+        flip_account.user = ctx.accounts.user.key();
+        flip_account.bid = bid;
+        flip_account.timestamp = Clock::get()?.unix_timestamp;
+        flip_account.user_action = false; // Will be updated during reveal
+        flip_account.ai_action = false;   // Will be updated during reveal
+        flip_account.result = GameResult::Lost; // Default to lost, will be updated if user wins
 
         msg!("Commitment stored. Hash: {:?}", commitment_hash);
         Ok(())
@@ -90,13 +99,11 @@ pub mod solflip {
         msg!("Random bytes: [{}, {}, {}], Combined: {}, AI choice: {}, User choice: {}", 
              random_bytes[0], random_bytes[1], random_bytes[31], combined_random, ai_choice, user_choice);
 
-        // Create flip result account
+        // Update flip result account (already created during commit)
         let flip_account = &mut ctx.accounts.flip_account;
-        flip_account.user = ctx.accounts.user.key();
         flip_account.user_action = user_choice;
         flip_account.ai_action = ai_choice;
-        flip_account.bid = commitment_account.bid;
-        flip_account.timestamp = current_time;
+        flip_account.timestamp = current_time; // Update to reveal time
 
         // Determine winner and handle payouts
         if user_choice == ai_choice {
@@ -147,6 +154,15 @@ pub struct CommitFlip<'info> {
     pub commitment_account: Account<'info, CommitmentAccount>,
     
     #[account(
+        init,
+        payer = user,
+        space = 8 + FlipAccount::INIT_SPACE,
+        seeds = [b"flip", user.key().as_ref(), seed.as_ref()],
+        bump,
+    )]
+    pub flip_account: Account<'info, FlipAccount>,
+    
+    #[account(
         mut,
         seeds = [b"vault"],
         bump,
@@ -170,9 +186,7 @@ pub struct RevealFlip<'info> {
     pub commitment_account: Account<'info, CommitmentAccount>,
     
     #[account(
-        init,
-        payer = user,
-        space = 8 + FlipAccount::INIT_SPACE,
+        mut,
         seeds = [b"flip", user.key().as_ref(), seed.as_ref()],
         bump,
     )]

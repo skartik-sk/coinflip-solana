@@ -83,14 +83,20 @@ export function useCommitFlip() {
         program.programId
       )
 
+      const [flipPda] = web3.PublicKey.findProgramAddressSync(
+        [Buffer.from("flip"), provider.wallet.publicKey.toBuffer(), Buffer.from(seed)],
+        program.programId
+      )
+
       console.log('Committing flip with hash:', Array.from(commitmentHash))
 
-      // Call commit_flip instruction
+      // Call commit_flip instruction (now creates both commitment and flip accounts)
       const tx = await program.methods
         .commitFlip(seed, Array.from(commitmentHash), new BN(bidAmount * web3.LAMPORTS_PER_SOL))
         .accounts({
           user: provider.wallet.publicKey,
           commitmentAccount: commitmentPda,
+          flipAccount: flipPda,
           vault: vaultPda,
           systemProgram: web3.SystemProgram.programId,
         })
@@ -186,7 +192,7 @@ export function useRevealFlip() {
     onSuccess: (result) => {
       const aiChoiceText = result.aiChoice ? 'Tails' : 'Heads'
       const userChoiceText = result.userChoice ? 'Tails' : 'Heads'
-      
+      console.log(aiChoiceText, userChoiceText)
       if (result.userWon) {
         toast.success(`🎉 Congratulations! You Won!`, {
           description: `You chose ${userChoiceText}, AI chose ${aiChoiceText}. You won ${(result.bidAmount * 3).toFixed(3)} SOL! 💰`,

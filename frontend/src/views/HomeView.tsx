@@ -1,6 +1,6 @@
 import type { FC } from 'react';
 import { useState } from 'react';
-import { useWalletUi } from '@wallet-ui/react';
+
 import Coin from '../components/Coin';
 import GameControls from '../components/GameControls';
 import { useSolflipMutation, type FlipResult } from '../hooks/useSolflipProgram';

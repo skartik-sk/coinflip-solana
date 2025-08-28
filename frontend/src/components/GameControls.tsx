@@ -66,10 +66,13 @@ const GameControls: FC<GameControlsProps> = ({ userChoice, setUserChoice, onFlip
       
       {/* Bet info */}
       {userChoice && (
-        <div className="text-center text-sm bg-card/50 rounded-lg px-4 py-2 backdrop-blur-sm border border-border/30">
-          <div className="text-muted-foreground">Your bet:</div>
-          <div className="font-bold text-primary">
+        <div className="text-center text-sm bg-card/50 rounded-lg px-4 py-3 backdrop-blur-sm border border-border/30">
+          <div className="text-muted-foreground mb-1">Your bet:</div>
+          <div className="font-bold text-primary mb-2">
             {userChoice} • 0.01 SOL
+          </div>
+          <div className="text-xs text-amber-400 flex items-center justify-center gap-1">
+            💰 <span>All costs paid upfront - no extra fees if you lose!</span>
           </div>
         </div>
       )}
