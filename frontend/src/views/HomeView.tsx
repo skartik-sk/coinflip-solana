@@ -6,13 +6,14 @@ import GameControls from '../components/GameControls';
 import { useSolflipMutation, type FlipResult } from '../hooks/useSolflipProgram';
 import Confetti from '../components/Confetti';
 import { ResultDisplay } from '../components/ResultDisplay';
+import { useWallet } from '@solana/wallet-adapter-react';
 
 const HomeView: FC = () => {
   const [userChoice, setUserChoice] = useState<'heads' | 'tails' | null>(null);
   const [result, setResult] = useState<FlipResult | null>(null);
   const [showResult, setShowResult] = useState(false);
 
-  const { wallet } = useWalletUi();
+  const { wallet } = useWallet();
   const flipMutation = useSolflipMutation();
 
   const handleFlip = async () => {
@@ -22,27 +23,42 @@ const HomeView: FC = () => {
     setResult(null);
 
     try {
-      // Convert user choice to boolean (false = heads, true = tails)
-      const userAction = userChoice === 'tails';
-      
-      // Set bid amount (0.01 SOL)
-      const bidAmount = 0.01;
-
-      console.log('Starting flip with:', { userChoice, userAction, bidAmount });
-
-      const flipResult = await flipMutation.mutateAsync({
-        userChoice: userAction,
-        bidAmount
-      });
-
-      console.log('Flip completed:', flipResult);
-
-      // Wait for coin animation to complete
-      await new Promise((resolve) => setTimeout(resolve, 2500));
-
-      setResult(flipResult);
-      setShowResult(true);
-
+      if (!flipMutation.hasCommitment) {
+        // Phase 1: Commit
+        console.log('Committing flip with choice:', userChoice);
+        const commitResult = await flipMutation.commitFlip({
+          userChoice: userChoice === 'tails',
+          bidAmount: 0.01
+        });
+        
+        console.log('Commit result:', commitResult);
+        
+        // Show coin animation during commit
+        await new Promise((resolve) => setTimeout(resolve, 2500));
+        
+        // Auto-reveal after commitment, passing the commitment data directly
+        setTimeout(async () => {
+          try {
+            const commitmentData = {
+              nonce: commitResult.nonce,
+              userChoice: commitResult.userChoice,
+              seed: commitResult.seed
+            };
+            
+            console.log('Using commitment data for reveal:', commitmentData);
+            const flipResult = await flipMutation.revealFlip(commitmentData);
+            
+            // Wait for coin animation to complete
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            
+            setResult(flipResult);
+            setShowResult(true);
+          } catch (error) {
+            console.error('Reveal failed:', error);
+          }
+        }, 1000);
+        
+      }
     } catch (error) {
       console.error('Flip failed:', error);
       // Error is already handled by the mutation's onError
@@ -70,7 +86,14 @@ const HomeView: FC = () => {
       <div className="play-card">
         <div className="hero">
           <div className="left">
-            <h2>Flip for Fun — Win for Glory</h2>
+            <div style={{ position: 'relative' }}>
+              <h2>Flip for Fun — Win for Glory</h2>
+              {/* Animated payout badge */}
+              <div className="payout-badge" aria-hidden>
+                <span className="small">up to</span>
+                <span>3x</span>
+              </div>
+            </div>
             <p className="lead">
               A blazing-fast Solana-powered coin flip game. Connect your wallet, 
               place your bet, and let fortune decide your fate!
@@ -92,8 +115,9 @@ const HomeView: FC = () => {
                     <span>Secure & Fair</span>
                   </div>
                   <div className="feature-item">
-                    <span>�</span>
+                    <span>💎</span>
                     <span>3x Payouts</span>
+
                   </div>
                   <div className="feature-item">
                     <span>�</span>
@@ -172,6 +196,8 @@ const HomeView: FC = () => {
       </div>
 
       <Confetti play={isWin && showResult} />
+       <div className="bg-blob"></div>
+        <div className="bg-blob"></div>
     </div>
   );
 };

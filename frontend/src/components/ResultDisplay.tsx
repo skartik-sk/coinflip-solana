@@ -12,11 +12,20 @@ export function ResultDisplay({ result, isVisible }: ResultDisplayProps) {
   const aiChoiceText = result.aiChoice ? 'Tails' : 'Heads'
 
   return (
-    <div className="glass-card p-6 mt-6 max-w-md mx-auto animate-flip-in">
+    <div className="glass-card p-6 mt-6 max-w-md mx-auto animate-flip-in" style={{ position: 'relative' }}>
+      <div className="confetti-mini one" aria-hidden></div>
+      <div className="confetti-mini two" aria-hidden></div>
+      <div className="confetti-mini three" aria-hidden></div>
       <div className="text-center space-y-4">
         {/* Result Header */}
         <div className={`text-2xl font-bold ${result.userWon ? 'text-green-400' : 'text-red-400'}`}>
-          {result.userWon ? '🎉 You Won!' : '😔 You Lost!'}
+          {result.userWon ? (
+            <span className="flex items-center justify-center gap-3">
+              <span className="win-badge">🎉 You Won!</span>
+            </span>
+          ) : (
+            '😔 You Lost!'
+          )}
         </div>
 
         {/* Choices Display */}
@@ -60,27 +69,19 @@ export function ResultDisplay({ result, isVisible }: ResultDisplayProps) {
             <span>Transaction:</span>
             <span className="font-mono">{result.signature.slice(0, 12)}...{result.signature.slice(-4)}</span>
           </div>
-          {result.vaultBalance !== undefined && (
+          {result.commitTx && (
             <div className="flex items-center justify-between mt-1">
-              <span>Vault Balance:</span>
-              <span>{result.vaultBalance.toFixed(3)} SOL</span>
+              <span>Commit Tx:</span>
+              <span className="font-mono">{result.commitTx.slice(0, 8)}...{result.commitTx.slice(-4)}</span>
+            </div>
+          )}
+          {result.revealTx && (
+            <div className="flex items-center justify-between mt-1">
+              <span>Reveal Tx:</span>
+              <span className="font-mono">{result.revealTx.slice(0, 8)}...{result.revealTx.slice(-4)}</span>
             </div>
           )}
         </div>
-
-        {/* Program Logs (for debugging) */}
-        {process.env.NODE_ENV === 'development' && result.logs && (
-          <details className="text-left">
-            <summary className="text-xs text-gray-500 cursor-pointer">Program Logs</summary>
-            <div className="mt-2 text-xs font-mono bg-black/50 p-2 rounded max-h-32 overflow-y-auto">
-              {result.logs.map((log, index) => (
-                <div key={index} className="text-gray-400">
-                  {log}
-                </div>
-              ))}
-            </div>
-          </details>
-        )}
       </div>
     </div>
   )

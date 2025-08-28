@@ -1,12 +1,13 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { address } from 'gill'
 import { useWalletUi } from '@wallet-ui/react'
-import { install as installEd25519 } from '@solana/webcrypto-ed25519-polyfill'
-
-// polyfill ed25519 for browsers
-installEd25519()
+import { useAnchorProvider } from '../components/solana/SolanaProvider'
+import { Program, web3, BN } from '@coral-xyz/anchor'
+import { IDL, type Solflip } from '../utils/IDL'
+import { useWallet } from '@solana/wallet-adapter-react'
+import { keccak_256 } from 'js-sha3'
 
 // Solflip program ID
 const PROGRAM_ID = address('3CpefKdfgchxYEomDTSPT3oix2X1b3fnhiNSnP2dtVJr')
@@ -18,7 +19,7 @@ export function useSolflipProgramId() {
 export function useSolflipProgram() {
   const { client, cluster } = useWalletUi()
   const programId = useSolflipProgramId()
-
+  
   return useQuery({
     retry: false,
     queryKey: ['get-program-account', { cluster }],
@@ -26,74 +27,160 @@ export function useSolflipProgram() {
   })
 }
 
-// For the flip mutation, we'll call the actual Solana program using Anchor
-export function useSolflipMutation() {
-  const { wallet, cluster } = useWalletUi()
+// Generate commitment hash
+function generateCommitmentHash(userChoice: boolean, nonce: bigint, userPubkey: web3.PublicKey): Uint8Array {
+  const data = new Uint8Array(1 + 8 + 32) // bool + u64 + pubkey
+  
+  // Add user choice (1 byte)
+  data[0] = userChoice ? 1 : 0
+  
+  // Add nonce (8 bytes, little endian)
+  const nonceBytes = new ArrayBuffer(8)
+  const nonceView = new DataView(nonceBytes)
+  nonceView.setBigUint64(0, nonce, true) // little endian
+  data.set(new Uint8Array(nonceBytes), 1)
+  
+  // Add user pubkey (32 bytes)
+  data.set(userPubkey.toBytes(), 9)
+  
+  return new Uint8Array(keccak_256.arrayBuffer(data))
+}
 
+// Phase 1: Commit mutation
+export function useCommitFlip() {
+  const { wallet } = useWallet()
+  const provider = useAnchorProvider()
+  const program = new Program(IDL as Solflip, provider)
+  
   return useMutation({
-    mutationFn: async ({ userChoice, bidAmount }: { userChoice: boolean; bidAmount: number }) => {
-      if (!wallet) {
+    mutationFn: async ({ 
+      userChoice, 
+      bidAmount, 
+      seed 
+    }: { 
+      userChoice: boolean
+      bidAmount: number
+      seed: string 
+    }) => {
+      if (!wallet || !provider.wallet.publicKey) {
         throw new Error('Wallet not connected')
       }
 
-      try {
-        // For now, we'll simulate the transaction but with more realistic behavior
-        // TODO: Implement actual Anchor program call when we have proper setup
-        
-        console.log('Calling Solflip program with:', {
-          userChoice,
-          bidAmount,
-          cluster: cluster.id,
-          program: PROGRAM_ID.toString()
+      // Generate random nonce for commitment
+      const nonce = BigInt(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER))
+      
+      // Generate commitment hash
+      const commitmentHash = generateCommitmentHash(userChoice, nonce, provider.wallet.publicKey)
+      
+      // Get PDAs
+      const [vaultPda] = web3.PublicKey.findProgramAddressSync(
+        [Buffer.from("vault")],
+        program.programId
+      )
+      
+      const [commitmentPda] = web3.PublicKey.findProgramAddressSync(
+        [Buffer.from("commitment"), provider.wallet.publicKey.toBuffer(), Buffer.from(seed)],
+        program.programId
+      )
+
+      console.log('Committing flip with hash:', Array.from(commitmentHash))
+
+      // Call commit_flip instruction
+      const tx = await program.methods
+        .commitFlip(seed, Array.from(commitmentHash), new BN(bidAmount * web3.LAMPORTS_PER_SOL))
+        .accounts({
+          user: provider.wallet.publicKey,
+          commitmentAccount: commitmentPda,
+          vault: vaultPda,
+          systemProgram: web3.SystemProgram.programId,
         })
-        
-        // Simulate network delay
-        await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000))
-        
-        // Simulate random AI choice based on timestamp (more realistic than pure random)
-        const timestamp = Date.now()
-        const aiChoice = (timestamp % 2) === 0
-        const userWon = userChoice === aiChoice
-        
-        // Simulate transaction signature
-        const signature = `flip_tx_${timestamp}_${Math.random().toString(36).substr(2, 9)}`
-        
-        // Simulate different scenarios based on vault balance (as per contract logic)
-        const simulatedVaultBalance = Math.random() * 10 // Random vault balance 0-10 SOL
-        const requiredBalance = bidAmount * 3
-        
-        let finalResult = userWon
-        let finalAiChoice = aiChoice
-        
-        // If vault doesn't have enough funds, AI chooses opposite (as per contract)
-        if (simulatedVaultBalance <= requiredBalance) {
-          finalAiChoice = !userChoice
-          finalResult = false
-          console.log('Vault underfunded - AI chose opposite')
-        }
-        
-        // Create program logs similar to what the contract would emit
-        const logs = [
-          `Program ${PROGRAM_ID} invoke [1]`,
-          `Program data: ${userChoice ? 'Tails' : 'Heads'} vs ${finalAiChoice ? 'Tails' : 'Heads'}`,
-          `Program ${PROGRAM_ID} consumed 10000 of 200000 compute units`,
-          finalResult ? `Program log: "won"` : `Program log: "lost"`,
-          `Program ${PROGRAM_ID} success`
-        ]
-        
-        return {
-          userChoice,
-          aiChoice: finalAiChoice,
-          userWon: finalResult,
-          bidAmount,
-          signature,
-          logs,
-          vaultBalance: simulatedVaultBalance
-        }
-        
-      } catch (error) {
-        console.error('Solflip transaction failed:', error)
-        throw error
+        .rpc()
+
+      return {
+        signature: tx,
+        nonce,
+        userChoice,
+        bidAmount,
+        seed,
+        commitmentHash: Array.from(commitmentHash)
+      }
+    },
+    onSuccess: () => {
+      toast.success('Commitment submitted!', {
+        description: 'Your choice has been locked in. Now reveal to see the result!',
+        duration: 4000,
+      })
+    },
+    onError: (error) => {
+      console.error('Commit failed:', error)
+      toast.error('Failed to commit choice', {
+        description: 'Please check your wallet connection and balance.',
+        duration: 5000,
+      })
+    },
+  })
+}
+
+// Phase 2: Reveal mutation
+export function useRevealFlip() {
+  const { wallet } = useWallet()
+  const provider = useAnchorProvider()
+  const program = new Program(IDL as Solflip, provider)
+  
+  return useMutation({
+    mutationFn: async ({ 
+      userChoice, 
+      nonce, 
+      seed 
+    }: { 
+      userChoice: boolean
+      nonce: bigint
+      seed: string 
+    }) => {
+      if (!wallet || !provider.wallet.publicKey) {
+        throw new Error('Wallet not connected')
+      }
+
+      // Get PDAs
+      const [vaultPda] = web3.PublicKey.findProgramAddressSync(
+        [Buffer.from("vault")],
+        program.programId
+      )
+      
+      const [commitmentPda] = web3.PublicKey.findProgramAddressSync(
+        [Buffer.from("commitment"), provider.wallet.publicKey.toBuffer(), Buffer.from(seed)],
+        program.programId
+      )
+      
+      const [flipPda] = web3.PublicKey.findProgramAddressSync(
+        [Buffer.from("flip"), provider.wallet.publicKey.toBuffer(), Buffer.from(seed)],
+        program.programId
+      )
+
+      console.log('Revealing flip with choice:', userChoice, 'nonce:', nonce.toString())
+
+      // Call reveal_flip instruction
+      const tx = await program.methods
+        .revealFlip(seed, userChoice, new BN(nonce.toString()))
+        .accounts({
+          user: provider.wallet.publicKey,
+          commitmentAccount: commitmentPda,
+          flipAccount: flipPda,
+          vault: vaultPda,
+          systemProgram: web3.SystemProgram.programId,
+        })
+        .rpc()
+
+      // Fetch the flip result
+      const flipAccount = await (program.account as any).flipAccount.fetch(flipPda)
+      
+      return {
+        signature: tx,
+        userChoice: flipAccount.userAction,
+        aiChoice: flipAccount.aiAction,
+        userWon: flipAccount.result.hasOwnProperty('won'),
+        bidAmount: flipAccount.bid.toNumber() / web3.LAMPORTS_PER_SOL,
+        timestamp: flipAccount.timestamp.toNumber()
       }
     },
     onSuccess: (result) => {
@@ -111,32 +198,22 @@ export function useSolflipMutation() {
           duration: 6000,
         })
       }
-      
-      // Additional toast for transaction details
-      toast.info(`Transaction Confirmed`, {
-        description: `TX: ${result.signature.slice(0, 20)}...`,
-        duration: 3000,
-      })
     },
     onError: (error) => {
-      console.error('Flip failed:', error)
+      console.error('Reveal failed:', error)
       
-      // Provide more specific error messages
-      let errorMessage = 'Flip failed. Please try again.'
-      let description = 'Check your wallet connection and balance.'
+      let errorMessage = 'Failed to reveal choice'
+      let description = 'Please try again.'
       
-      if (error.message.includes('Wallet not connected')) {
-        errorMessage = 'Wallet Not Connected'
-        description = 'Please connect your wallet to play.'
-      } else if (error.message.includes('insufficient funds')) {
-        errorMessage = 'Insufficient Balance'
-        description = 'You need more SOL to place this bid.'
-      } else if (error.message.includes('User rejected')) {
-        errorMessage = 'Transaction Cancelled'
-        description = 'You cancelled the transaction.'
-      } else if (error.message.includes('network')) {
-        errorMessage = 'Network Error'
-        description = 'Please check your internet connection.'
+      if (error.message.includes('AlreadyRevealed')) {
+        errorMessage = 'Already Revealed'
+        description = 'This commitment has already been revealed.'
+      } else if (error.message.includes('CommitmentExpired')) {
+        errorMessage = 'Commitment Expired'
+        description = 'Your commitment has expired. Please start a new game.'
+      } else if (error.message.includes('InvalidReveal')) {
+        errorMessage = 'Invalid Reveal'
+        description = 'The revealed choice doesn\'t match your commitment.'
       }
       
       toast.error(errorMessage, {
@@ -147,12 +224,88 @@ export function useSolflipMutation() {
   })
 }
 
+// Combined hook for the full flow
+export function useSolflipMutation() {
+  const [commitmentData, setCommitmentData] = useState<{
+    nonce: bigint
+    userChoice: boolean
+    seed: string
+  } | null>(null)
+  
+  const commitMutation = useCommitFlip()
+  const revealMutation = useRevealFlip()
+  
+  const commitFlip = async ({ userChoice, bidAmount }: { userChoice: boolean; bidAmount: number }) => {
+    const seed = Array.from(globalThis.crypto.getRandomValues(new Uint8Array(6)))
+      .map(b => (b % 36).toString(36))
+      .join('')
+
+    try {
+      const result = await commitMutation.mutateAsync({
+        userChoice,
+        bidAmount,
+        seed
+      })
+      
+      // Store commitment data for reveal phase
+      setCommitmentData({
+        nonce: result.nonce,
+        userChoice: result.userChoice,
+        seed: result.seed
+      })
+      
+      console.log('Commitment data stored:', {
+        nonce: result.nonce,
+        userChoice: result.userChoice,
+        seed: result.seed
+      })
+      
+      return result
+    } catch (error) {
+      console.error('Commit failed:', error)
+      throw error
+    }
+  }
+  
+  const revealFlip = async (commitData?: { nonce: bigint; userChoice: boolean; seed: string }) => {
+    const dataToUse = commitData || commitmentData;
+    console.log('Current commitment data:', commitmentData)
+    console.log('Passed commit data:', commitData)
+    console.log('Data to use for reveal:', dataToUse)
+    
+    if (!dataToUse) {
+      throw new Error('No commitment data available')
+    }
+    
+    try {
+      console.log('Revealing with data:', dataToUse)
+      const result = await revealMutation.mutateAsync(dataToUse)
+      setCommitmentData(null) // Clear commitment data after reveal
+      return result
+    } catch (error) {
+      console.error('Reveal failed:', error)
+      throw error
+    }
+  }
+  
+  return {
+    commitFlip,
+    revealFlip,
+    isCommitting: commitMutation.isPending,
+    isRevealing: revealMutation.isPending,
+    isPending: commitMutation.isPending || revealMutation.isPending,
+    hasCommitment: !!commitmentData,
+    error: commitMutation.error || revealMutation.error
+  }
+}
+
 export type FlipResult = {
   userChoice: boolean
   aiChoice: boolean
   userWon: boolean
   bidAmount: number
   signature: string
-  logs: string[]
-  vaultBalance?: number
+  timestamp: number
+  commitTx?: string
+  revealTx?: string
 }

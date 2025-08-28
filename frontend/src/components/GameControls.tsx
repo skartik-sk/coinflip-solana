@@ -52,12 +52,14 @@ const GameControls: FC<GameControlsProps> = ({ userChoice, setUserChoice, onFlip
         }`}
       >
         {isFlipping ? (
-          <span className="flex items-center justify-center gap-2">
+          <span className="flex items-center justify-center gap-2 relative">
             <span className="animate-spin">🎲</span> Flipping...
+            <span className="sparkles" aria-hidden></span>
           </span>
         ) : (
-          <span className="flex items-center justify-center gap-2">
+          <span className="flex items-center justify-center gap-2 relative">
             🚀 Start Flip
+            <span className="sparkles" aria-hidden></span>
           </span>
         )}
       </button>

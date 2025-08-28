@@ -8,7 +8,7 @@ interface CoinProps {
 
 const Coin: FC<CoinProps> = ({ isFlipping, result, isWin = false }) => {
   const getCoinClasses = () => {
-    let classes = 'coin';
+    let classes = '';
     if (isFlipping) classes += ' flipping';
     if (result === 'heads') classes += ' heads';
     if (result === 'tails') classes += ' tails';
@@ -17,23 +17,27 @@ const Coin: FC<CoinProps> = ({ isFlipping, result, isWin = false }) => {
   };
 
   return (
-    <div className="coin-container flex justify-center items-center h-48 md:h-56">
-      <div className={getCoinClasses()}>
+    <div className=" flex justify-center items-center h-48 md:h-56">
+      <div style={{ position: 'relative' }}>
+        <div className={getCoinClasses()}>
         {!isFlipping && result && (
-          <span className="text-2xl font-bold">
+          <span className="text-[10rem] animate-pulse">
             {result === 'heads' ? '🪙' : '⚪'}
           </span>
         )}
         {isFlipping && (
-          <span className="text-2xl font-bold animate-pulse">
+          <span className="text-[10rem] font-bold animate-pulse">
             🌟
           </span>
         )}
         {!isFlipping && !result && (
-          <span className="text-2xl font-bold opacity-50">
-            ?
+          <span className="text-[10rem] font-bold opacity-50">
+            🪙
           </span>
         )}
+        </div>
+
+      
       </div>
     </div>
   );

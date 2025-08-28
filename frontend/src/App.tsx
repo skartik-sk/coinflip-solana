@@ -8,7 +8,7 @@ import Footer from './components/Footer';
 const App: FC = () => {
   return (
     <AppProviders>
-      <div className="min-h-screen flex flex-col">
+      <div className="min-h-screen flex flex-col px-24">
         {/* Animated background */}
         <div className="animated-bg">
           <div className="bg-blob"></div>
@@ -26,6 +26,11 @@ const App: FC = () => {
         {/* Toast notifications */}
         <ToastProvider />
       </div>
+
+          <div className="bg-blob"></div>
+          <div className="bg-blob"></div>
+          <div className="bg-blob"></div>
+
     </AppProviders>
   );
 };
