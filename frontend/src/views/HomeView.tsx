@@ -34,7 +34,7 @@ const HomeView: FC = () => {
         console.log('Commit result:', commitResult);
         
         // Show coin animation during commit
-        await new Promise((resolve) => setTimeout(resolve, 2500));
+       // await new Promise((resolve) => setTimeout(resolve, 2500));
         
         // Auto-reveal after commitment, passing the commitment data directly
         setTimeout(async () => {
@@ -49,14 +49,14 @@ const HomeView: FC = () => {
             const flipResult = await flipMutation.revealFlip(commitmentData);
             
             // Wait for coin animation to complete
-            await new Promise((resolve) => setTimeout(resolve, 1000));
+          //  await new Promise((resolve) => setTimeout(resolve, 1000));
             
             setResult(flipResult);
             setShowResult(true);
           } catch (error) {
             console.error('Reveal failed:', error);
           }
-        }, 1000);
+        }, 500);
         
       }
     } catch (error) {
@@ -171,11 +171,13 @@ const HomeView: FC = () => {
               <div className="flex items-center justify-center space-x-3">
                 <div className="animate-spin w-5 h-5 border-2 border-primary border-t-transparent rounded-full"></div>
                 <span className="text-primary font-medium">
-                  Processing on Solana...
+                  {flipMutation.isCommitting ? 'Committing your choice...' : 'Revealing result...'}
                 </span>
               </div>
               <p className="text-sm text-muted-foreground mt-2">
-                Your flip is being confirmed on-chain
+                {flipMutation.isCommitting 
+                  ? 'Securing your bet on-chain' 
+                  : '🎲 Wallet popup amounts may vary - actual payout depends on coin flip result!'}
               </p>
             </div>
           </div>

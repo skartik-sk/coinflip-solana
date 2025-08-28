@@ -165,7 +165,38 @@ export function useRevealFlip() {
 
       console.log('Revealing flip with choice:', userChoice, 'nonce:', nonce.toString())
 
-      // Call reveal_flip instruction
+      // Show info toast before transaction
+      toast.info('🎲 Revealing your choice...', {
+        description: 'The wallet popup might show different amounts - this is normal! The actual result depends on the coin flip outcome.',
+        duration: 3000,
+      })
+
+      // Build the transaction first
+      const instruction = await program.methods
+        .revealFlip(seed, userChoice, new BN(nonce.toString()))
+        .accounts({
+          user: provider.wallet.publicKey,
+          commitmentAccount: commitmentPda,
+          flipAccount: flipPda,
+          vault: vaultPda,
+          systemProgram: web3.SystemProgram.programId,
+        })
+        .instruction()
+
+      // Create transaction
+      const transaction = new web3.Transaction().add(instruction)
+      transaction.recentBlockhash = (await provider.connection.getLatestBlockhash()).blockhash
+      transaction.feePayer = provider.wallet.publicKey
+
+      // Simulate transaction to get result without executing
+      try {
+        const simulation = await provider.connection.simulateTransaction(transaction)
+        console.log('Transaction simulation:', simulation)
+      } catch (simError) {
+        console.log('Simulation error (expected):', simError)
+      }
+
+      // Execute the actual transaction
       const tx = await program.methods
         .revealFlip(seed, userChoice, new BN(nonce.toString()))
         .accounts({
@@ -192,7 +223,8 @@ export function useRevealFlip() {
     onSuccess: (result) => {
       const aiChoiceText = result.aiChoice ? 'Tails' : 'Heads'
       const userChoiceText = result.userChoice ? 'Tails' : 'Heads'
-      console.log(aiChoiceText, userChoiceText)
+      console.log('AI chose:', aiChoiceText, 'User chose:', userChoiceText, 'User won:', result.userWon)
+      
       if (result.userWon) {
         toast.success(`🎉 Congratulations! You Won!`, {
           description: `You chose ${userChoiceText}, AI chose ${aiChoiceText}. You won ${(result.bidAmount * 3).toFixed(3)} SOL! 💰`,
@@ -200,7 +232,7 @@ export function useRevealFlip() {
         })
       } else {
         toast.error(`😔 You Lost This Round!`, {
-          description: `You chose ${userChoiceText}, AI chose ${aiChoiceText}. You lost ${result.bidAmount.toFixed(3)} SOL. Try again!`,
+          description: `You chose ${userChoiceText}, AI chose ${aiChoiceText}. Better luck next time!`,
           duration: 6000,
         })
       }
