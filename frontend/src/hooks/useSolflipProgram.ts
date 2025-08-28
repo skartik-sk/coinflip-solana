@@ -171,30 +171,7 @@ export function useRevealFlip() {
         duration: 3000,
       })
 
-      // Build the transaction first
-      const instruction = await program.methods
-        .revealFlip(seed, userChoice, new BN(nonce.toString()))
-        .accounts({
-          user: provider.wallet.publicKey,
-          commitmentAccount: commitmentPda,
-          flipAccount: flipPda,
-          vault: vaultPda,
-          systemProgram: web3.SystemProgram.programId,
-        })
-        .instruction()
-
-      // Create transaction
-      const transaction = new web3.Transaction().add(instruction)
-      transaction.recentBlockhash = (await provider.connection.getLatestBlockhash()).blockhash
-      transaction.feePayer = provider.wallet.publicKey
-
-      // Simulate transaction to get result without executing
-      try {
-        const simulation = await provider.connection.simulateTransaction(transaction)
-        console.log('Transaction simulation:', simulation)
-      } catch (simError) {
-        console.log('Simulation error (expected):', simError)
-      }
+      
 
       // Execute the actual transaction
       const tx = await program.methods
