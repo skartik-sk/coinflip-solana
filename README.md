@@ -1,93 +1,83 @@
-[![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/idxPpgnz)
-![School of Solana](https://github.com/Ackee-Blockchain/school-of-solana/blob/master/.banner/banner.png?raw=true)
+# Project Description
 
-## 📚Solana Program
-We are about halfway through the course, and you already have some experience with programming on Solana. It is time to create something on your own! You will be building a dApp that will serve as the culmination of everything you have learned so far. Feel free to implement whatever comes to your mind, (as long as it passes the requirements).
+**Deployed Frontend URL:** [https://coinflip.skartik.xyz]
 
-**This does not mean that the School of Solana is coming to an end just yet!** There are still several exciting lectures ahead, as well as one security related task.
+**Solana Program ID:** 3CpefKdfgchxYEomDTSPT3oix2X1b3fnhiNSnP2dtVJr
 
-### Task details
-This task consists of two parts:
-1. **Core of your dApp**
-    - A deployed Solana program.
-2. **Frontend**
-    - A simple frontend to interact with the dApp.
+## Project Overview
 
-### Requirements
-- An Anchor program deployed on **Devnet** or **Mainnet**.
-- The Anchor program must use a PDA (Program Derived Address).
-- At least one TypeScript **test** for each Anchor program instruction. These tests should cover both **happy** and **unhappy** (intentional error-triggering) scenarios.
-- A simple **frontend** deployed using your preferred provider (for more info, check below).
-- A filled out **PROJECT_DESCRIPTION.md** file.
+### Description
+SolFlip is a stunning, animated coin flip gambling dApp built on Solana blockchain with a playful UI and real-time transactions. Users can place bets on coin flips (heads or tails) against the house, with outcomes determined by on-chain randomness. The dApp features beautiful 3D coin animations, confetti celebrations for wins, and a modern glassmorphism design using a carefully curated color palette. Each flip is a unique transaction with its own seed, ensuring fair and verifiable randomness while providing an engaging gaming experience with instant feedback.
 
-### Ideas
-We highly recommend starting with something simple. Take time to think through your project and work on it in iterations. Do not try to implement everything at once!
+### Key Features
+- **🎯 Fair Coin Flipping**: Place bets on heads or tails with blockchain-verified randomness
+- **💰 Real SOL Betting**: Bet actual SOL tokens with configurable amounts (default 0.01 SOL)
+- **🎨 Stunning 3D Animations**: Beautiful coin flip animations with realistic physics
+- **🎉 Interactive Celebrations**: Confetti animations and visual feedback for wins
+- **⚡ Lightning Fast**: Instant transactions powered by Solana's speed
+- **📱 Responsive Design**: Works seamlessly on desktop and mobile devices
+- **🔒 Secure & Transparent**: All randomness generated on-chain, verifiable results
 
-Below is a list of few ideas to get you started:
-- **Social app**
-    - Instagram
-    - Giphy
-    - Friendtech
-    - Spotify
-- **Blog**
-- **Voting** ([D21 - Janeček method](https://www.ih21.org/en/guidelines))
-- **DeFi**
-    - Crowdfunding
-    - Raffles
-    - Escrow
-    - Tipping
-    - Lending ([Save Documentation](https://docs.save.finance/))
-    - Liquid Staking ([Marinade Documentation](https://docs.marinade.finance/))
-    - Data Query with Pyth ([Pyth Documentation](https://docs.pyth.network/price-feeds))
-    - AMM ([Raydium Documentation](https://raydium.gitbook.io/raydium/))
-- **Gaming**
-    - Browser Game ([Gaming on Solana](https://solanacookbook.com/gaming/nfts-in-games.html#nfts-in-games))
+### How to Use the dApp
+1. **Connect Wallet** - Connect your Phantom or Solflare wallet to the dApp
+2. **Choose Your Side** - Select either "Heads" or "Tails" using the animated buttons
+3. **Review Your Bet** - Default bet is 0.01 SOL (displayed below the controls)
+4. **Start Flip** - Click "🚀 Start Flip" to initiate the on-chain transaction
+5. **Watch the Magic** - Enjoy the 3D coin flip animation with realistic physics
+6. **Celebrate or Try Again** - See confetti for wins, or place another bet for losses
 
-### Deadline
-The deadline for this task is **Wednesday, August 27th, at 23:59 UTC**.
->[!CAUTION]
->Note that we will not accept submissions after the deadline.
+## Program Architecture
+The SolFlip program uses a sophisticated architecture with unique flip accounts for each game, a shared vault for house funds, and deterministic PDA generation for security. The program implements on-chain randomness generation and automatic payout distribution based on game outcomes.
 
-### Submission
-There are two folders, one for the Anchor project, and one for the frontend. Push your changes to the **main** branch of **this** repository.
+### PDA Usage
+The program uses Program Derived Addresses to create unique game instances and manage the house vault securely.
 
->[!IMPORTANT]
->It is essential that you fill out the `PROJECT_DESCRIPTION.md` template completely and accurately. This document will be used by AI for the initial evaluation, so provide detailed information about your project, including working links, clear descriptions, and technical implementation details.
+**PDAs Used:**
+- **Flip Account PDA**: Derived from seeds `["flip", user_wallet_pubkey, unique_seed]` - creates a unique account for each coin flip game, preventing replay attacks and ensuring game isolation
+- **Vault PDA**: Derived from seeds `["vault"]` - holds the house funds and manages payouts, ensuring only the program can access and distribute funds
 
-### Evaluation
-The evaluation process is based on the **requirements**. If you meet the requirements, you pass the task!
+### Program Instructions
+**Instructions Implemented:**
+- **flip**: Main game instruction that accepts user choice (heads/tails), bet amount, and unique seed. Creates a flip account, generates random outcome, and handles fund transfers based on win/loss
 
->[!NOTE]
->We have a record number of participants this season, so the first round of evaluations will be conducted by AI to verify requirements before manual review. AI can make mistakes. If you believe you fulfilled all requirements but weren't graded correctly, please create a support ticket and we will resolve the issue.
+### Account Structure
+```rust
+#[account]
+pub struct FlipAccount {
+    pub user: Pubkey,         // The wallet that initiated this flip
+    pub user_action: bool,    // User's choice: false = heads, true = tails
+    pub ai_action: bool,      // Program's random choice: false = heads, true = tails
+    pub bid: u64,            // Bet amount in lamports
+}
+```
 
->[!CAUTION]
->We expect original work that demonstrates your understanding and creativity. While you may draw inspiration from examples covered in lessons and tasks, **direct copying is not acceptable**. If you choose to build upon an example from the School of Solana materials, you must significantly expand it with additional features, instructions, and functionality to showcase your learning progress. 
+## Testing
 
-### Example Workflow
-Let's say you are going to implement the Twitter dApp as the Solana Program. Here's how the steps could look:
+### Test Coverage
+Comprehensive test suite covering multiple scenarios including edge cases with vault balance management, different bet amounts, and both winning and losing outcomes to ensure program security and fair gameplay.
 
-**1.** Implement Twitter dApp using the Anchor framework.
+**Happy Path Tests:**
+- **Heads Bet with Sufficient Vault**: Successfully processes heads bet with adequate house funds
+- **Tails Bet with Sufficient Vault**: Successfully processes tails bet with adequate house funds
+- **Multiple Sequential Flips**: Ensures each flip uses unique seeds and proper account creation
 
-**2.** Test the Twitter dApp using the Anchor framework.
+**Unhappy Path Tests:**
+- **Insufficient Vault Balance**: Tests behavior when house doesn't have enough funds to cover potential payouts
+- **Duplicate Seed Usage**: Prevents replay attacks by rejecting duplicate flip accounts
+- **Invalid Bet Amounts**: Handles edge cases with zero or excessive bet amounts
+- **Unauthorized Access**: Ensures only the user can access their flip results
 
-**3.** Deploy the Twitter dApp on the Solana Devnet.
+### Running Tests
+```bash
+cd anchor_project/solflip
+anchor test                    # run full test suite
+anchor test --skip-local-validator  # run with external validator
+```
 
-**4.** Using the create solana dapp template, implement frontend for the Twitter dApp.
+### Additional Notes for Evaluators
 
-**5.** Publish Frontend using [Vercel](https://vercel.com).
+This project showcases advanced Solana development concepts including PDA usage, on-chain randomness, and complex state management. The biggest technical challenges were implementing fair randomness generation on-chain (avoiding client-side manipulation), managing vault economics to ensure the house can cover payouts, and creating smooth user experience with proper error handling for failed transactions.
 
-**6.** Fill out the PROJECT_DESCRIPTION.md template.
+The frontend demonstrates modern React patterns with TypeScript, beautiful CSS animations using 3D transforms, and comprehensive wallet integration. Special attention was paid to user experience with loading states, transaction feedback, and responsive design across devices.
 
-**7.** Submit the Twitter dApp using GitHub Classroom.
-
-### Useful Links
-- [Vercel](https://vercel.com)
-- [Create Solana Dapp](https://github.com/solana-foundation/create-solana-dapp)
-- [Account Macro Constraints](https://docs.rs/anchor-lang/latest/anchor_lang/derive.Accounts.html#constraints)
-- [Solana Developers Courses](https://solana.com/developers/courses)
-
------
-
-### Need help?
->[!TIP]
->If you have any questions, feel free to reach out to us on [Discord](https://discord.gg/z3JVuZyFnp).
+Key learning outcomes: mastering PDA derivation patterns, understanding Solana's account model for game state, implementing robust error handling for blockchain transactions, and creating delightful user interactions that make blockchain complexity invisible to end users.
